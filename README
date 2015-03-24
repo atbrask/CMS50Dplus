@@ -1,0 +1,31 @@
+Contec CMS50D+ Pulse Oximeter Data Downloader
+=============================================
+
+This python script can download both live data from a Contec CMS50D+ pulse 
+oximeter into a standard CSV file for further analysis.
+
+For more details, see my blog post at http://www.atbrask.dk/?p=244
+
+History
+-------
+1.0 (2015-03-24) Uploaded initial version to GitHub
+
+Syntax
+------
+usage: cms50dplus.py [-h] serialport output
+
+cms50dplus.py v1.0 - Contec CMS50D+ Data Downloader (c) 2015 atbrask
+
+positional arguments:
+  serialport  The device's virtual serial port.
+  output      Output CSV file.
+
+optional arguments:
+  -h, --help  show this help message and exit
+
+Example
+-------
+If you have the device connected as /dev/ttyUSB0 and want the data saved as
+foo.csv, then the program can be run like this:
+
+./cms50dplus.py /dev/ttyUSB0 foo.csv
