@@ -96,6 +96,53 @@ class LiveDataPoint(object):
                 self.fingerOut, self.searching, self.droppingSpO2,
                 self.probeError]
 
+class RecordedDataPoint(object):
+    def __init__(self, data):
+        if data[0] & 0xfe != 0xf0 or data[1] & 0x80 == 0 or data[2] & 0x80 != 0:
+           print data
+           raise ValueError("Invalid data packet.")
+
+        # 1st byte
+        self.pulseRate = (data[0] & 0x01) << 7
+
+        # 2nd byte
+        self.pulseRate |= data[1] & 0x7f
+
+        # 3rd byte
+        self.bloodSpO2 = data[2] & 0x7f
+
+    def getBytes(self):
+        result = [0]*3
+
+        # 1st byte
+        result[0] = (self.pulseRate & 0x80) >> 7
+        result[0] |= 0xf0 # sync bits
+
+        # 2nd byte
+        result[1] = self.pulseRate & 0x7f
+        result[1] |= 0x80
+
+        # 3rd byte
+        result[2] = self.bloodSpO2 & 0x7f
+
+        return result
+
+    def __repr__(self):
+        hexBytes = ['0x{0:02X}'.format(byte) for byte in self.getBytes()]
+        return "RecordedDataPoint([{0}])".format(', '.join(hexBytes))
+
+    def __str__(self):
+        return ", ".join(["Pulse Rate = {0} bpm",
+                          "SpO2 = {1}%"]).format(self.pulseRate,
+                                                 self.bloodSpO2)
+
+    @staticmethod
+    def getCsvColumns():
+        return ["PulseRate", "SpO2"]
+
+    def getCsvData(self):
+        return [self.pulseRate, self.bloodSpO2]
+
 class CMS50Dplus(object):
     def __init__(self, port):
         self.port = port
@@ -111,7 +158,8 @@ class CMS50Dplus(object):
                                       parity = serial.PARITY_ODD,
                                       stopbits = serial.STOPBITS_ONE,
                                       bytesize = serial.EIGHTBITS,
-                                      timeout = 1)
+                                      timeout = 5,
+                                      xonxoff = 1)
         elif not self.isConnected():
             self.conn.open()
 
@@ -120,7 +168,23 @@ class CMS50Dplus(object):
             self.conn.close()
 
     def getByte(self):
-        return ord(self.conn.read())
+        char = self.conn.read()
+        if len(char) == 0:
+            return None
+        else:
+            return ord(char)
+    
+    def sendBytes(self, values):
+        return self.conn.write(''.join([chr(value & 0xff) for value in values]))
+
+    # Waits until the specified byte is seen or a timeout occurs
+    def expectByte(self, value):
+        while True:
+            byte = self.getByte()
+            if byte is None:
+                return False
+            elif byte == value:
+                return True
 
     def getLiveData(self):
         try:
@@ -130,6 +194,9 @@ class CMS50Dplus(object):
             while True:
                 byte = self.getByte()
             
+                if byte is None:
+                    break
+
                 if byte & 0x80:
                     if idx == 5 and packet[0] & 0x80:
                         yield LiveDataPoint(packet)
@@ -142,6 +209,64 @@ class CMS50Dplus(object):
         except:
             self.disconnect()
 
+    def getRecordedData(self):
+        try:
+            # Connect and check that we get some data.
+            self.connect()
+            for i in range(10):
+                if self.getByte() is None:
+                    raise Exception("No data stream from device!")
+
+            self.conn.flushInput()
+            self.sendBytes([0xf5, 0xf5])
+            self.conn.flush()
+
+            # Wait for preamble.
+            for x in range(3):
+                if (not (self.expectByte(0xf2) and 
+                         self.expectByte(0x80) and 
+                         self.expectByte(0x00))):
+                    raise Exception("No preamble in device response!")
+
+            # Wait for content length.
+            lena = self.getByte()
+            lenb = self.getByte()
+            lenc = self.getByte()
+
+            if ((lena & 0x80) == 0 or (lenb & 0x80) == 0 or (lenc & 0x80) != 0):
+                raise Exception("Corrupted length in header!")
+
+            length = (((lena & 0x7f) << 14) | ((lenb & 0x7f) << 7) | lenc) + 1
+
+            if length % 3 != 0:
+                raise Exception("Length not divisible by 3!")
+
+            # Calculate length in hours, minutes, and seconds.
+            s = length / 3
+            
+            h = int(s / 3600)
+            s -= h * 3600
+
+            m = int(s / 60)
+            s -= m * 60
+
+            print "Number of measurements: {0} ({1}h{2}m{3}s)".format(length / 3, h, m, s)
+
+            # Content...
+            packet = [0]*3
+            for i in range(length):
+                byte = self.getByte()
+                if byte is None:
+                    raise Exception("Timeout during download!")
+                packet[i%3] = byte
+                if i%3 == 2:
+                    yield RecordedDataPoint(packet)
+                    packet = [0]*3
+
+        finally:
+            self.sendBytes([0xf6, 0xf6, 0xf6])
+            self.disconnect()
+
 def dumpLiveData(port, filename):
     print "Saving live data..."
     print "Press CTRL-C or disconnect the device to terminate data collection."
@@ -152,21 +277,36 @@ def dumpLiveData(port, filename):
         writer.writerow(LiveDataPoint.getCsvColumns())
         for liveData in oximeter.getLiveData():
             writer.writerow(liveData.getCsvData())
-            
-            measurements+=1
+            measurements += 1
             sys.stdout.write("\rGot {0} measurements...".format(measurements))
             sys.stdout.flush()
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="cms50dplus.py v1.0 - Contec CMS50D+ Data Downloader (c) 2015 atbrask")
+def dumpRecordedData(port, filename):
+    print "Saving recorded data..."
+    print "Please wait as the latest session is downloaded..."
+    oximeter = CMS50Dplus(port)
+    measurements = 0
+    with open(filename, 'wb') as csvfile:
+        writer = csv.writer(csvfile, quoting=csv.QUOTE_NONNUMERIC)
+        writer.writerow(RecordedDataPoint.getCsvColumns())
+        for recordedData in oximeter.getRecordedData():
+            writer.writerow(recordedData.getCsvData())
+            measurements += 1
+            sys.stdout.write("\rGot {0} measurements...".format(measurements))
+            sys.stdout.flush()        
 
-    # Required fields
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="cms50dplus.py v1.1 - Contec CMS50D+ Data Downloader (c) 2015 atbrask")
+    parser.add_argument("mode", help="Specify LIVE for live data or RECORDED for recorded data.", choices=["LIVE", "RECORDED"])
     parser.add_argument("serialport", help="The device's virtual serial port.")
     parser.add_argument("output", help="Output CSV file.")
 
     args = parser.parse_args()
 
-    dumpLiveData(args.serialport, args.output)
+    if args.mode == 'LIVE':
+        dumpLiveData(args.serialport, args.output)
+    else:
+        dumpRecordedData(args.serialport, args.output)
 
     print ""
     print "Done."

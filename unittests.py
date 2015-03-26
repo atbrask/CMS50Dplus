@@ -104,6 +104,31 @@ class CMS50DplusTests(unittest.TestCase):
             self.assertEquals(y.getBytes(), [0x80, 0, 0, 0, x])
             self.assertEquals(y.__repr__(), eval(y.__repr__()).__repr__())
 
+    # RECORDED DATA
+    def test_RecordedData_init_length(self):
+        self.assertRaises(IndexError, RecordedDataPoint, [0xf0,0x80])
+        RecordedDataPoint([0xf0, 0x80, 0])
+
+    def test_RecordedData_init_syncbits(self):
+        self.assertRaises(ValueError, RecordedDataPoint, [0,0,0])
+        self.assertRaises(ValueError, RecordedDataPoint, [0xf0,0,0])
+        self.assertRaises(ValueError, RecordedDataPoint, [0,0x80,0])
+
+    def test_RecordedData_pulseRate(self):
+        for x in range(256):
+            highbit = (x & 0x80) >> 7
+            lowbits = x & 0x7f
+            y = RecordedDataPoint([0xf0 | highbit, 0x80 | lowbits, 0])
+            self.assertEquals(y.pulseRate, x)
+            self.assertEquals(y.getBytes(), [0xf0 | highbit, 0x80 | lowbits, 0])
+            self.assertEquals(y.__repr__(), eval(y.__repr__()).__repr__())
+
+    def test_RecordedData_bloodSpO2(self):
+        for x in range(128):
+            y = RecordedDataPoint([0xf0, 0x80, x])
+            self.assertEquals(y.bloodSpO2, x)
+            self.assertEquals(y.getBytes(), [0xf0, 0x80, x])
+            self.assertEquals(y.__repr__(), eval(y.__repr__()).__repr__())            
 
 if __name__ == '__main__':
     unittest.main()
