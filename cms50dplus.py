@@ -1,10 +1,12 @@
 #!/usr/bin/env python
-import sys, serial, argparse, csv, time
+import sys, serial, argparse, csv, datetime
 
 class LiveDataPoint(object):
-    def __init__(self, data): 
+    def __init__(self, time, data): 
         if [d & 0x80 != 0 for d in data] != [True, False, False, False, False]:
            raise ValueError("Invalid data packet.")
+
+        self.time = time
 
         # 1st byte
         self.signalStrength = data[0] & 0x0f
@@ -61,37 +63,39 @@ class LiveDataPoint(object):
 
     def __repr__(self):
         hexBytes = ['0x{0:02X}'.format(byte) for byte in self.getBytes()]
-        return "LiveDataPoint([{0}])".format(', '.join(hexBytes))
+        return "LiveDataPoint({0}, [{1}])".format(self.time.__repr__(), ', '.join(hexBytes))
 
     def __str__(self):
-        return ", ".join(["Signal Strength = {0}",
-                          "Finger Out = {1}",
-                          "Dropping SpO2 = {2}",
-                          "Beep = {3}",
-                          "Pulse waveform = {4}",
-                          "Bar Graph = {5}",
-                          "Probe Error = {6}",
-                          "Searching = {7}",
-                          "Pulse Rate = {8} bpm",
-                          "SpO2 = {9}%"]).format(self.signalStrength,
-                                                 self.fingerOut,
-                                                 self.droppingSpO2,
-                                                 self.beep,
-                                                 self.pulseWaveform,
-                                                 self.barGraph,
-                                                 self.probeError,
-                                                 self.searching,
-                                                 self.pulseRate,
-                                                 self.bloodSpO2)
+        return ", ".join(["Time = {0}",
+                          "Signal Strength = {1}",
+                          "Finger Out = {2}",
+                          "Dropping SpO2 = {3}",
+                          "Beep = {4}",
+                          "Pulse waveform = {5}",
+                          "Bar Graph = {6}",
+                          "Probe Error = {7}",
+                          "Searching = {8}",
+                          "Pulse Rate = {9} bpm",
+                          "SpO2 = {10}%"]).format(self.time,
+                                                  self.signalStrength,
+                                                  self.fingerOut,
+                                                  self.droppingSpO2,
+                                                  self.beep,
+                                                  self.pulseWaveform,
+                                                  self.barGraph,
+                                                  self.probeError,
+                                                  self.searching,
+                                                  self.pulseRate,
+                                                  self.bloodSpO2)
 
     @staticmethod
     def getCsvColumns():
-        return ["PulseRate", "SpO2", "PulseWaveform", "BarGraph", 
+        return ["Time", "PulseRate", "SpO2", "PulseWaveform", "BarGraph", 
                 "SignalStrength", "Beep", "FingerOut", "Searching",
                 "DroppingSpO2", "ProbeError"]
 
     def getCsvData(self):
-        return [self.pulseRate, self.bloodSpO2, self.pulseWaveform,
+        return [self.time, self.pulseRate, self.bloodSpO2, self.pulseWaveform,
                 self.barGraph, self.signalStrength, self.beep,
                 self.fingerOut, self.searching, self.droppingSpO2,
                 self.probeError]
@@ -199,7 +203,7 @@ class CMS50Dplus(object):
 
                 if byte & 0x80:
                     if idx == 5 and packet[0] & 0x80:
-                        yield LiveDataPoint(packet)
+                        yield LiveDataPoint(datetime.datetime.utcnow(), packet)
                     packet = [0]*5
                     idx = 0
             

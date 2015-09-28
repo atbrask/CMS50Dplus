@@ -10,6 +10,7 @@ History
 -------
 1.0 (2015-03-24) Uploaded initial version to GitHub
 1.1 (2015-03-26) Added support for downloading recorded data
+1.2 (2015-09-28) Added UTC time to live mode output
 
 Syntax
 ------
