@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import unittest, datetime
+import unittest
 from cms50dplus import *
 
 class CMS50DplusTests(unittest.TestCase):
@@ -118,26 +118,30 @@ class CMS50DplusTests(unittest.TestCase):
 
     # RECORDED DATA
     def test_RecordedData_init_length(self):
-        self.assertRaises(IndexError, RecordedDataPoint, [0xf0,0x80])
-        RecordedDataPoint([0xf0, 0x80, 0])
+        t = datetime.datetime.utcnow()
+        self.assertRaises(IndexError, RecordedDataPoint, t, [0xf0,0x80])
+        RecordedDataPoint(t, [0xf0, 0x80, 0])
 
     def test_RecordedData_init_syncbits(self):
-        self.assertRaises(ValueError, RecordedDataPoint, [0,0,0])
-        self.assertRaises(ValueError, RecordedDataPoint, [0xf0,0,0])
-        self.assertRaises(ValueError, RecordedDataPoint, [0,0x80,0])
+        t = datetime.datetime.utcnow()
+        self.assertRaises(ValueError, RecordedDataPoint, t, [0,0,0])
+        self.assertRaises(ValueError, RecordedDataPoint, t, [0xf0,0,0])
+        self.assertRaises(ValueError, RecordedDataPoint, t, [0,0x80,0])
 
     def test_RecordedData_pulseRate(self):
+        t = datetime.datetime.utcnow()
         for x in range(256):
             highbit = (x & 0x80) >> 7
             lowbits = x & 0x7f
-            y = RecordedDataPoint([0xf0 | highbit, 0x80 | lowbits, 0])
+            y = RecordedDataPoint(t, [0xf0 | highbit, 0x80 | lowbits, 0])
             self.assertEquals(y.pulseRate, x)
             self.assertEquals(y.getBytes(), [0xf0 | highbit, 0x80 | lowbits, 0])
             self.assertEquals(y.__repr__(), eval(y.__repr__()).__repr__())
 
     def test_RecordedData_bloodSpO2(self):
+        t = datetime.datetime.utcnow()
         for x in range(128):
-            y = RecordedDataPoint([0xf0, 0x80, x])
+            y = RecordedDataPoint(t, [0xf0, 0x80, x])
             self.assertEquals(y.bloodSpO2, x)
             self.assertEquals(y.getBytes(), [0xf0, 0x80, x])
             self.assertEquals(y.__repr__(), eval(y.__repr__()).__repr__())            

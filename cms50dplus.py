@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys, serial, argparse, csv, datetime
+from dateutil import parser as dateparser
 
 class LiveDataPoint(object):
     def __init__(self, time, data): 
@@ -101,10 +102,12 @@ class LiveDataPoint(object):
                 self.probeError]
 
 class RecordedDataPoint(object):
-    def __init__(self, data):
+    def __init__(self, time, data):
         if data[0] & 0xfe != 0xf0 or data[1] & 0x80 == 0 or data[2] & 0x80 != 0:
            print data
            raise ValueError("Invalid data packet.")
+
+        self.time = time
 
         # 1st byte
         self.pulseRate = (data[0] & 0x01) << 7
@@ -133,19 +136,21 @@ class RecordedDataPoint(object):
 
     def __repr__(self):
         hexBytes = ['0x{0:02X}'.format(byte) for byte in self.getBytes()]
-        return "RecordedDataPoint([{0}])".format(', '.join(hexBytes))
+        return "RecordedDataPoint({0}, [{1}])".format(self.time.__repr__(), ', '.join(hexBytes))
 
     def __str__(self):
-        return ", ".join(["Pulse Rate = {0} bpm",
-                          "SpO2 = {1}%"]).format(self.pulseRate,
+        return ", ".join(["Time = {0}",
+                          "Pulse Rate = {1} bpm",
+                          "SpO2 = {2}%"]).format(self.time,
+                                                 self.pulseRate,
                                                  self.bloodSpO2)
 
     @staticmethod
     def getCsvColumns():
-        return ["PulseRate", "SpO2"]
+        return ["Time", "PulseRate", "SpO2"]
 
     def getCsvData(self):
-        return [self.pulseRate, self.bloodSpO2]
+        return [self.time, self.pulseRate, self.bloodSpO2]
 
 class CMS50Dplus(object):
     def __init__(self, port):
@@ -213,7 +218,7 @@ class CMS50Dplus(object):
         except:
             self.disconnect()
 
-    def getRecordedData(self):
+    def getRecordedData(self, time):
         try:
             # Connect and check that we get some data.
             self.connect()
@@ -264,7 +269,8 @@ class CMS50Dplus(object):
                     raise Exception("Timeout during download!")
                 packet[i%3] = byte
                 if i%3 == 2:
-                    yield RecordedDataPoint(packet)
+                    yield RecordedDataPoint(time, packet)
+                    time = time + datetime.timedelta(seconds=1)
                     packet = [0]*3
 
         finally:
@@ -285,7 +291,7 @@ def dumpLiveData(port, filename):
             sys.stdout.write("\rGot {0} measurements...".format(measurements))
             sys.stdout.flush()
 
-def dumpRecordedData(port, filename):
+def dumpRecordedData(starttime, port, filename):
     print "Saving recorded data..."
     print "Please wait as the latest session is downloaded..."
     oximeter = CMS50Dplus(port)
@@ -293,24 +299,34 @@ def dumpRecordedData(port, filename):
     with open(filename, 'wb') as csvfile:
         writer = csv.writer(csvfile, quoting=csv.QUOTE_NONNUMERIC)
         writer.writerow(RecordedDataPoint.getCsvColumns())
-        for recordedData in oximeter.getRecordedData():
+        for recordedData in oximeter.getRecordedData(starttime):
             writer.writerow(recordedData.getCsvData())
             measurements += 1
             sys.stdout.write("\rGot {0} measurements...".format(measurements))
             sys.stdout.flush()        
 
+def valid_datetime(s):
+    try:
+        return dateparser.parse(s)
+    except ValueError:
+        msg = "Not a valid date: '{0}'.".format(s)
+        raise argparse.ArgumentTypeError(msg)
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="cms50dplus.py v1.1 - Contec CMS50D+ Data Downloader (c) 2015 atbrask")
+    parser = argparse.ArgumentParser(description="cms50dplus.py v1.2 - Contec CMS50D+ Data Downloader (c) 2015 atbrask")
     parser.add_argument("mode", help="Specify LIVE for live data or RECORDED for recorded data.", choices=["LIVE", "RECORDED"])
     parser.add_argument("serialport", help="The device's virtual serial port.")
     parser.add_argument("output", help="Output CSV file.")
+    parser.add_argument('-s', "--starttime", help="The start time for RECORDED mode data.", type=valid_datetime)
 
     args = parser.parse_args()
 
     if args.mode == 'LIVE':
         dumpLiveData(args.serialport, args.output)
+    elif args.mode == 'RECORDED' and args.starttime is not None:
+        dumpRecordedData(args.starttime, args.serialport, args.output)
     else:
-        dumpRecordedData(args.serialport, args.output)
+        print "Missing start time for RECORDED mode."
 
     print ""
     print "Done."

@@ -4,27 +4,35 @@ Contec CMS50D+ Pulse Oximeter Data Downloader
 This python script can download both live data and recorded data from a Contec 
 CMS50D+ pulse oximeter into a standard CSV file for further analysis.
 
+In live data mode the device will sample at 60 Hz. Each sample is saved to CSV 
+along with the current wallclock time (in UTC). For recorded data you'll have
+to provide a start time as the device doesn't provide any historic timestamps
+at all. In this mode we assume a sample rate of 1 Hz.
+
 For more details, see my blog post at http://www.atbrask.dk/?p=244
 
 History
 -------
 1.0 (2015-03-24) Uploaded initial version to GitHub
 1.1 (2015-03-26) Added support for downloading recorded data
-1.2 (2015-09-28) Added UTC time to live mode output
+1.2 (2015-09-28) Added time column to output CSV for both modes
 
 Syntax
 ------
-usage: cms50dplus.py [-h] {LIVE,RECORDED} serialport output
+usage: cms50dplus.py [-h] [-s STARTTIME] {LIVE,RECORDED} serialport output
 
-cms50dplus.py v1.1 - Contec CMS50D+ Data Downloader (c) 2015 atbrask
+cms50dplus.py v1.2 - Contec CMS50D+ Data Downloader (c) 2015 atbrask
 
 positional arguments:
-  {LIVE,RECORDED}  Specify LIVE for live data or RECORDED for recorded data.
-  serialport       The device's virtual serial port.
-  output           Output CSV file.
+  {LIVE,RECORDED}       Specify LIVE for live data or RECORDED for recorded
+                        data.
+  serialport            The device's virtual serial port.
+  output                Output CSV file.
 
 optional arguments:
-  -h, --help       show this help message and exit
+  -h, --help            show this help message and exit
+  -s STARTTIME, --starttime STARTTIME
+                        The start time for RECORDED mode data.
 
 
 Example
@@ -36,5 +44,5 @@ foo.csv, then the program can be run like this:
 
 Likewise for recorded data:
 
-./cms50dplus.py RECORDED /dev/ttyUSB0 foo.csv
+./cms50dplus.py RECORDED /dev/ttyUSB0 foo.csv -s "2015-01-01 12:34:56"
 
