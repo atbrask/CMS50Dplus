@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys, serial, argparse, csv, datetime
 from dateutil import parser as dateparser
+import numpy as np
 
 class LiveDataPoint(object):
     def __init__(self, time, data): 
@@ -100,6 +101,12 @@ class LiveDataPoint(object):
                 self.barGraph, self.signalStrength, self.beep,
                 self.fingerOut, self.searching, self.droppingSpO2,
                 self.probeError]
+
+    def getDictData(self):
+        ret = dict()
+        for n, d in zip(self.getCsvColumns(), self.getCsvData()):
+            ret[n] = d
+        return ret
 
 class RecordedDataPoint(object):
     def __init__(self, time, data):
@@ -291,6 +298,12 @@ def dumpLiveData(port, filename):
             sys.stdout.write("\rGot {0} measurements...".format(measurements))
             sys.stdout.flush()
 
+def getLiveData(port):
+    oximeter = CMS50Dplus(port)
+    for liveData in oximeter.getLiveData():
+        yield liveData.getDictData()
+
+
 def dumpRecordedData(starttime, port, filename):
     print "Saving recorded data..."
     print "Please wait as the latest session is downloaded..."
@@ -325,6 +338,14 @@ if __name__ == "__main__":
         dumpLiveData(args.serialport, args.output)
     elif args.mode == 'RECORDED' and args.starttime is not None:
         dumpRecordedData(args.starttime, args.serialport, args.output)
+    elif args.mode == 'LIVEPLOT':
+        import matplotlib.pyplot as plt
+        data = []
+        plt.figure()
+        for k in getLiveData(args.serialport):
+            data.append(k)
+            plt.clf()
+            plt.plot(range(0, range(len(data))), np.asarray(data, dtype=float))
     else:
         print "Missing start time for RECORDED mode."
 
