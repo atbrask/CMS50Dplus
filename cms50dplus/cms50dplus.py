@@ -301,7 +301,7 @@ def dumpLiveData(port, filename):
 def getLiveData(port):
     oximeter = CMS50Dplus(port)
     for liveData in oximeter.getLiveData():
-        yield liveData.getDictData()
+        print liveData.getDictData()
 
 
 def dumpRecordedData(starttime, port, filename):
@@ -338,14 +338,6 @@ if __name__ == "__main__":
         dumpLiveData(args.serialport, args.output)
     elif args.mode == 'RECORDED' and args.starttime is not None:
         dumpRecordedData(args.starttime, args.serialport, args.output)
-    elif args.mode == 'LIVEPLOT':
-        import matplotlib.pyplot as plt
-        data = []
-        plt.figure()
-        for k in getLiveData(args.serialport):
-            data.append(k)
-            plt.clf()
-            plt.plot(range(0, range(len(data))), np.asarray(data, dtype=float))
     else:
         print "Missing start time for RECORDED mode."
 
