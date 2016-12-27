@@ -301,7 +301,7 @@ def dumpLiveData(port, filename):
 def getLiveData(port):
     oximeter = CMS50Dplus(port)
     for liveData in oximeter.getLiveData():
-        print liveData.getDictData()
+        yield liveData.getDictData()
 
 
 def dumpRecordedData(starttime, port, filename):
