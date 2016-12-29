@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import sys, serial, argparse, csv, datetime
 from dateutil import parser as dateparser
-import numpy as np
+import time
 
 class LiveDataPoint(object):
     def __init__(self, time, data): 
@@ -298,9 +298,11 @@ def dumpLiveData(port, filename):
             sys.stdout.write("\rGot {0} measurements...".format(measurements))
             sys.stdout.flush()
 
-def getLiveData(port):
+def getLiveData(port, framerate=None):
     oximeter = CMS50Dplus(port)
     for liveData in oximeter.getLiveData():
+        if framerate is not None:
+            time.sleep(1.0/framerate)
         yield liveData.getDictData()
 
 
