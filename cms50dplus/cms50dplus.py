@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys, serial, argparse, csv, datetime
 from dateutil import parser as dateparser
+import time
 
 class LiveDataPoint(object):
     def __init__(self, time, data): 
@@ -100,6 +101,12 @@ class LiveDataPoint(object):
                 self.barGraph, self.signalStrength, self.beep,
                 self.fingerOut, self.searching, self.droppingSpO2,
                 self.probeError]
+
+    def getDictData(self):
+        ret = dict()
+        for n, d in zip(self.getCsvColumns(), self.getCsvData()):
+            ret[n] = d
+        return ret
 
 class RecordedDataPoint(object):
     def __init__(self, time, data):
@@ -290,6 +297,14 @@ def dumpLiveData(port, filename):
             measurements += 1
             sys.stdout.write("\rGot {0} measurements...".format(measurements))
             sys.stdout.flush()
+
+def getLiveData(port, framerate=None):
+    oximeter = CMS50Dplus(port)
+    for liveData in oximeter.getLiveData():
+        if framerate is not None:
+            time.sleep(1.0/framerate)
+        yield liveData.getDictData()
+
 
 def dumpRecordedData(starttime, port, filename):
     print "Saving recorded data..."
