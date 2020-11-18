@@ -111,7 +111,7 @@ class LiveDataPoint(object):
 class RecordedDataPoint(object):
     def __init__(self, time, data):
         if data[0] & 0xfe != 0xf0 or data[1] & 0x80 == 0 or data[2] & 0x80 != 0:
-           print data
+           print(data)
            raise ValueError("Invalid data packet.")
 
         self.time = time
@@ -266,7 +266,7 @@ class CMS50Dplus(object):
             m = int(s / 60)
             s -= m * 60
 
-            print "Number of measurements: {0} ({1}h{2}m{3}s)".format(length / 3, h, m, s)
+            print("Number of measurements: {0} ({1}h{2}m{3}s)".format(length / 3, h, m, s))
 
             # Content...
             packet = [0]*3
@@ -285,8 +285,8 @@ class CMS50Dplus(object):
             self.disconnect()
 
 def dumpLiveData(port, filename):
-    print "Saving live data..."
-    print "Press CTRL-C or disconnect the device to terminate data collection."
+    print("Saving live data...")
+    print("Press CTRL-C or disconnect the device to terminate data collection.")
     oximeter = CMS50Dplus(port)
     measurements = 0
     with open(filename, 'wb') as csvfile:
@@ -307,8 +307,8 @@ def getLiveData(port, framerate=None):
 
 
 def dumpRecordedData(starttime, port, filename):
-    print "Saving recorded data..."
-    print "Please wait as the latest session is downloaded..."
+    print("Saving recorded data...")
+    print("Please wait as the latest session is downloaded...")
     oximeter = CMS50Dplus(port)
     measurements = 0
     with open(filename, 'wb') as csvfile:
@@ -341,7 +341,7 @@ if __name__ == "__main__":
     elif args.mode == 'RECORDED' and args.starttime is not None:
         dumpRecordedData(args.starttime, args.serialport, args.output)
     else:
-        print "Missing start time for RECORDED mode."
+        print("Missing start time for RECORDED mode.")
 
-    print ""
-    print "Done."
+    print("")
+    print("Done.")

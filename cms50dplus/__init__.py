@@ -1,1 +1,1 @@
-from cms50dplus import *
+from .cms50dplus import *
